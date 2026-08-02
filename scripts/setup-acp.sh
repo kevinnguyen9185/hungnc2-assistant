@@ -47,6 +47,20 @@ fail()  { printf '  \033[31m✘\033[0m %s\n' "$*"; }
 in_ct()    { docker exec "$CONTAINER" bash -c "$*"; }
 in_ct_it() { docker exec -it "$CONTAINER" bash -c "$*"; }
 
+# retry wrapper for `openclaw config set`: the gateway rewrites openclaw.json
+# on boot/reload, and a config set that races it fails with
+# "ConfigMutationConflictError: config changed since last load". Transient —
+# just retry with a pause.
+cfg_set() {
+  local tries=5 i
+  for ((i=1; i<=tries; i++)); do
+    in_ct "openclaw config set $*" 2>/dev/null && return 0
+    sleep 3
+  done
+  # last attempt WITHOUT swallowing stderr, so a real error is visible
+  in_ct "openclaw config set $*"
+}
+
 # --- 0. container up (and not crash-looping)? --------------------------------
 bold "[0/5] Checking container '$CONTAINER'..."
 if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
@@ -72,10 +86,10 @@ ok "container is running (stable)"
 # --- 1. Telegram channel (token comes from .env → container env) -------------
 bold "[1/5] Telegram channel"
 if in_ct 'test -n "${TELEGRAM_BOT_TOKEN:-}"'; then
-  in_ct 'openclaw config set channels.telegram.enabled true'
-  in_ct 'openclaw config set channels.telegram.botToken "$TELEGRAM_BOT_TOKEN"'
+  cfg_set 'channels.telegram.enabled true'
+  cfg_set 'channels.telegram.botToken "$TELEGRAM_BOT_TOKEN"'
   # Strict by default: unknown senders get a pairing code until you approve.
-  in_ct 'openclaw config set channels.telegram.dmPolicy pairing'
+  cfg_set 'channels.telegram.dmPolicy pairing'
   ok "telegram configured (dmPolicy=pairing)"
 else
   warn "TELEGRAM_BOT_TOKEN not set in .env — skipping telegram channel"
@@ -142,11 +156,11 @@ else
   in_ct "openclaw plugins install @openclaw/acpx"
   ok "installed"
 fi
-in_ct "openclaw config set plugins.entries.acpx.enabled true"
+cfg_set "plugins.entries.acpx.enabled true"
 # Headless = nobody can click "approve", so writes/exec must be pre-approved
 # or every session dies at its first permission prompt. This is the power
 # dial AND the danger dial — guardrails live in workspace/projects/CLAUDE.md.
-in_ct "openclaw config set plugins.entries.acpx.config.permissionMode approve-all"
+cfg_set "plugins.entries.acpx.config.permissionMode approve-all"
 ok "enabled, permissionMode=approve-all"
 
 # Define one OpenClaw agent per worker (docs: /tools/acp-agents "Runtime
