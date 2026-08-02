@@ -61,6 +61,9 @@ services:
       # FILTERED environment: GH_TOKEN is stripped there, so env-based gh
       # auth works in `docker exec` but fails inside agent tool calls.
       - GH_CONFIG_DIR=/home/openclaw/.openclaw/gh
+      # Claude Code: skip telemetry/statsig calls. On datacenter IPs (Hetzner)
+      # those endpoints stall and claude hangs at "Checking connectivity...".
+      - CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 
     # [from template] rotate container logs so they can't fill the disk.
     logging:
