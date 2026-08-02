@@ -247,11 +247,14 @@ is_logged_in() {
 do_login() {
   case "$1" in
     claude)
-      warn "Claude Code headless login:"
+      warn "Claude Code headless login (token flow):"
       echo "     A URL will be printed. Open it in the browser on YOUR LAPTOP,"
       echo "     approve with the account that has your Claude subscription,"
       echo "     then paste the code back into this terminal."
-      in_ct_it "claude /login || claude" ;;
+      # setup-token, NOT the interactive UI: the interactive login's
+      # "Checking connectivity" probes claude.ai, which Cloudflare stalls
+      # on datacenter IPs (Hetzner) — it hangs forever there.
+      in_ct_it "claude setup-token" ;;
     codex)
       warn "Codex browser login:"
       echo "     Copy the printed https://auth.openai.com/... URL into your"
