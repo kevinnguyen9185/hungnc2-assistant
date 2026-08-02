@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    actor U as User (phone)
+    participant M as Miniapp (webview)
+    participant B as Backend (VPS :8788)
+    participant C as copilot CLI (pty, same box)
+    participant P as GitHub
+
+    Note over B,C: FUTURE — requires Copilot CLI in the image<br/>+ a provider entry in server.js
+
+    U->>M: tap "Connect Copilot"
+    M->>B: POST /api/auth/copilot/start
+    B->>C: spawn copilot login (GitHub device flow)
+    C-->>B: prints user-code + github.com/login/device
+    B-->>M: state=awaiting_approval + code + link
+    M->>P: open github.com/login/device in webview
+    Note over M: webview can PRE-FILL the code field —<br/>user just taps Continue + Authorize
+    U->>P: approve
+    loop until approved
+        C->>P: poll device-token endpoint
+    end
+    P-->>C: access token granted
+    C-->>B: exit 0 → probe login status OK
+    B-->>M: state=success
+    M-->>U: Copilot connected ✓

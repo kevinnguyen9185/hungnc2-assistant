@@ -1,0 +1,14 @@
+{
+  "name": "hungnc2-miniapp-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Miniapp backend: browser-driven auth setup for ACP workers (claude/codex)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "node-pty": "^1.0.0"
+  }
+}

@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    actor U as User (phone)
+    participant M as Miniapp (webview)
+    participant B as Backend (VPS :8788)
+    participant C as claude CLI (pty, same box)
+    participant P as Anthropic OAuth
+
+    U->>M: tap "Connect Claude Code"
+    M->>B: POST /api/auth/claude/start
+    B->>C: spawn `claude /login`
+    C-->>B: prints auth URL (captured from pty)
+    B-->>M: state=awaiting_approval + authUrl
+    M->>P: open authUrl in webview
+    U->>P: sign in + approve
+    P-->>M: success page displays a short code
+    Note over M: webview reads the code off the page<br/>(fallback: user taps it once)
+    M->>B: POST /api/auth/claude/input { code }
+    B->>C: write code to the CLI's stdin
+    C->>P: exchange code for tokens
+    C-->>B: exit 0 → probe "claude -p ping" OK
+    B-->>M: state=success
+    M-->>U: Claude Code connected ✓

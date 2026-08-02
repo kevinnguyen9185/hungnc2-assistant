@@ -1,0 +1,138 @@
+# hungnc2-assistant — OpenClaw gateway + Claude Code + Codex in one container.
+#
+# Merged 2026-07-22 with the battle-tested settings from
+# zaloclaw-infra-api/app/template/docker-compose.yml (your work template).
+# What was taken and why is marked with "[from template]".
+# What was deliberately NOT taken: Traefik labels, external networks,
+# published ports — this assistant needs zero inbound connections.
+#
+# Rocky Linux notes:
+#   * SELinux is ENFORCING by default on Rocky → every bind mount below
+#     uses the ":Z" suffix so Docker relabels it. Without :Z you get
+#     "permission denied" even as root.
+#   * Works with Docker CE. If you use Podman instead, `podman compose`
+#     understands this same file.
+#
+# NOTE: paths on the RIGHT side of ":" are inside the container.
+#       Everything the assistant knows lives in ./data and ./workspace
+#       → back those two folders up and you can rebuild anywhere.
+
+services:
+  openclaw:
+    build: .
+    container_name: hungnc2-assistant
+    restart: unless-stopped
+    env_file: .env
+
+    # [from template] security hardening — costs nothing, blocks whole
+    # classes of container-escape tricks:
+    #   cap_drop ALL        = no Linux superpowers (we run non-root anyway)
+    #   no-new-privileges   = a process can never gain more rights than it started with
+    #   pids_limit          = a runaway fork bomb can't freeze the VPS
+    #                         (500, not the template's 200 — Claude Code
+    #                          spawns many small helper processes)
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 500
+
+    # [from template] init: true = a tiny PID-1 that cleans up dead
+    # child processes. Important here: the ACP harnesses spawn/kill
+    # subprocesses all day.
+    init: true
+
+    # [from template] memory cap so one wild session can't OOM the VPS.
+    # 2g is a sane floor for Claude Code + Codex; raise in .env if needed.
+    mem_limit: ${OPENCLAW_MEM_LIMIT:-2g}
+    memswap_limit: ${OPENCLAW_MEM_LIMIT:-2g}
+
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      # [from template] Rocky's Docker bridge silently drops IPv6 loopback,
+      # making Node.js wait ~20s before falling back to IPv4. Force IPv4 first.
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+      # Corporate SSL interception (VNG proxy): make Node tools (openclaw,
+      # claude, codex) trust the company root CA. Put the .crt in ./certs/.
+      # Harmless on networks without a proxy (missing file = warning only).
+      - NODE_EXTRA_CA_CERTS=/home/openclaw/certs/za-ecc-root-ca.crt
+      # gh CLI auth lives in FILES under this dir (inside the persistent
+      # ./data/openclaw volume). Needed because agent shells run with a
+      # FILTERED environment: GH_TOKEN is stripped there, so env-based gh
+      # auth works in `docker exec` but fails inside agent tool calls.
+      - GH_CONFIG_DIR=/home/openclaw/.openclaw/gh
+
+    # [from template] rotate container logs so they can't fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    volumes:
+      # OpenClaw config + state (openclaw.json, pairing DB, sessions)
+      - ./data/openclaw:/home/openclaw/.openclaw:Z
+      # Claude Code auth + its session history  (created by `claude` login)
+      - ./data/claude:/home/openclaw/.claude:Z
+      # Codex auth + its session history        (created by `codex login`)
+      - ./data/codex:/home/openclaw/.codex:Z
+      # Shared brain: repos, NOTES.md, CLAUDE.md, AGENTS.md
+      - ./workspace:/home/openclaw/workspace:Z
+      # Corporate root CA (see NODE_EXTRA_CA_CERTS above), read-only
+      - ./certs:/home/openclaw/certs:ro,Z
+
+    # Dashboard, reachable ONLY from this machine (127.0.0.1 = never the
+    # network). Telegram/Zalo stay OUTBOUND — nothing else comes in.
+    # On the VPS you can remove this and use an SSH tunnel instead.
+    ports:
+      - "127.0.0.1:18789:18789"
+      # Codex browser login (use scripts/codex-login.sh): codex's callback
+      # server binds to localhost INSIDE the container, which Docker port
+      # forwarding cannot reach directly. So we map host 1455 → container
+      # 1456, where the login script runs a tiny relay → localhost:1455.
+      # 127.0.0.1 = this machine only; nothing listens outside login time.
+      - "127.0.0.1:1455:1456"
+
+    # [from template] cheap liveness probe: ask the gateway's own /healthz
+    # endpoint (port 18789 inside the container, never published).
+    # `openclaw doctor` stays a manual tool — too heavy to run every minute.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Miniapp backend: lets a phone miniapp trigger worker logins (claude/codex)
+  # without copy-paste. Shares the auth volumes with the openclaw service, so
+  # a login done here is immediately visible to the gateway.
+  # Mac test: http://localhost:8788 (loopback only).
+  # VPS: put behind Traefik/HTTPS + your miniapp user auth before exposing.
+  miniapp:
+    build:
+      context: .
+      dockerfile: miniapp-backend/Dockerfile
+    container_name: hungnc2-miniapp
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+      - NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/za-ecc-root-ca.crt
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    init: true
+    mem_limit: 512m
+    volumes:
+      - ./data/openclaw:/home/openclaw/.openclaw:Z
+      - ./data/claude:/home/openclaw/.claude:Z
+      - ./data/codex:/home/openclaw/.codex:Z
+    ports:
+      - "127.0.0.1:8788:8788"

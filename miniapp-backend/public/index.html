@@ -1,0 +1,142 @@
+<!doctype html>
+<!--
+  Demo UI for the miniapp backend. In the real Zalo/Telegram miniapp, the
+  webview intercepts the OAuth redirect to http://localhost:PORT/... and
+  POSTs it to /api/auth/:provider/callback automatically (zero copy-paste).
+  This plain-browser demo can't intercept, so it shows a paste box as the
+  manual fallback of the same endpoint.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACP worker setup</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 24px auto; padding: 0 16px; background:#101418; color:#e8e8e8; }
+  h1 { font-size: 1.3em; }
+  .card { background:#1a2027; border-radius:12px; padding:16px; margin:12px 0; }
+  .row { display:flex; justify-content:space-between; align-items:center; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; }
+  .on { background:#3ddc84; } .off { background:#666; } .err { background:#e05252; }
+  button { background:#2f6fed; color:#fff; border:0; border-radius:8px; padding:10px 14px; font-size:1em; }
+  button:disabled { opacity:.5; }
+  input { width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid #333; background:#0d1116; color:#eee; margin-top:8px; }
+  a.auth { display:inline-block; margin-top:10px; word-break:break-all; color:#7ab7ff; }
+  pre { background:#0d1116; padding:10px; border-radius:8px; font-size:.75em; overflow-x:auto; max-height:160px; }
+  .muted { color:#889; font-size:.85em; }
+</style>
+</head>
+<body>
+<h1>ACP worker setup</h1>
+<div class="muted">API token: <input id="token" placeholder="MINIAPP_API_TOKEN from .env">
+  <span id="tokenState">enter token to check status</span></div>
+<div id="cards"></div>
+
+<script>
+const PROVIDERS = ["claude", "codex"];
+const $ = (id) => document.getElementById(id);
+const api = (p, opt = {}) =>
+  fetch("/api" + p, {
+    ...opt,
+    headers: { "Content-Type": "application/json", "X-Api-Token": $("token").value, ...(opt.headers || {}) },
+  }).then((r) => r.json());
+
+function card(name) {
+  return `<div class="card" id="c-${name}">
+    <div class="row">
+      <div><span class="dot off" id="dot-${name}"></span><b>${name}</b>
+        <span class="muted" id="st-${name}">…</span></div>
+      <button id="btn-${name}" onclick="start('${name}')">Connect</button>
+    </div>
+    <div id="flow-${name}"></div>
+  </div>`;
+}
+$("cards").innerHTML = PROVIDERS.map(card).join("");
+
+async function refresh() {
+  if (!$("token").value.trim()) {
+    $("tokenState").textContent = "enter token to check status";
+    return;
+  }
+  try {
+    const p = await api("/providers");
+    if (p.error) { $("tokenState").textContent = "✘ " + p.error; return; }
+    $("tokenState").textContent = "✓ token accepted";
+    for (const name of PROVIDERS) {
+      const info = p[name] || {};
+      $("dot-" + name).className = "dot " + (info.loggedIn ? "on" : "off");
+      $("st-" + name).textContent = info.loggedIn ? "connected" : (info.loginState || "not connected");
+      // a connected worker doesn't need Connect — pressing it starts a NEW
+      // login. Relabel so that's obvious.
+      const btn = $("btn-" + name);
+      if (!btn.disabled) btn.textContent = info.loggedIn ? "Reconnect" : "Connect";
+    }
+  } catch (e) {
+    $("tokenState").textContent = "backend unreachable";
+  }
+}
+
+// check as soon as a token is typed/pasted (debounced), not just every 10s
+let tokenTimer;
+$("token").addEventListener("input", () => {
+  clearTimeout(tokenTimer);
+  tokenTimer = setTimeout(refresh, 400);
+});
+
+async function start(name) {
+  $("btn-" + name).disabled = true;
+  await api(`/auth/${name}/start`, { method: "POST" });
+  poll(name);
+}
+
+async function poll(name) {
+  const s = await api(`/auth/${name}/status`);
+  const flow = $("flow-" + name);
+  if (s.state === "awaiting_approval" && s.authUrl) {
+    // Render the form ONCE — re-rendering on every poll wipes what the
+    // user is typing. Later polls only refresh the output <pre>.
+    if (flow.dataset.rendered !== "awaiting") {
+      flow.dataset.rendered = "awaiting";
+      flow.innerHTML = `
+        <a class="auth" href="${s.authUrl}" target="_blank">1. Tap to approve in browser →</a>
+        <div class="muted" style="margin-top:8px">2. If the browser ends on a dead localhost page,
+          paste its full URL here (the real miniapp does this automatically):</div>
+        <input id="cb-${name}" placeholder="http://localhost:1455/auth/callback?...">
+        <div class="muted">…or if you were shown a code instead:</div>
+        <input id="code-${name}" placeholder="paste code">
+        <button style="margin-top:8px" onclick="finish('${name}')">Submit</button>
+        <pre id="out-${name}"></pre>`;
+    }
+    const out = document.getElementById("out-" + name);
+    if (out) out.textContent = (s.outputTail || "").slice(-500);
+  } else if (s.state === "starting") {
+    flow.dataset.rendered = "";
+    // show raw CLI output while waiting — if the CLI is stuck on an
+    // unexpected prompt, this is where you see it
+    flow.innerHTML = `<div class="muted">starting…</div><pre>${(s.outputTail || "").slice(-600)}</pre>`;
+  } else if (s.state === "success") {
+    flow.dataset.rendered = "";
+    flow.innerHTML = `<div class="muted">✓ connected</div>`;
+    $("btn-" + name).disabled = false;
+    return refresh();
+  } else if (s.state === "error") {
+    flow.innerHTML = `<div class="muted" style="color:#e05252">${s.error || "failed"}</div>
+      <pre>${(s.outputTail || "").slice(-800)}</pre>`;
+    $("btn-" + name).disabled = false;
+    return refresh();
+  }
+  setTimeout(() => poll(name), 1500);
+}
+
+async function finish(name) {
+  const cb = $("cb-" + name).value.trim();
+  const code = $("code-" + name).value.trim();
+  if (cb) await api(`/auth/${name}/callback`, { method: "POST", body: JSON.stringify({ url: cb }) });
+  else if (code) await api(`/auth/${name}/input`, { method: "POST", body: JSON.stringify({ text: code }) });
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

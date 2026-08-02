@@ -1,0 +1,159 @@
+<!doctype html>
+<!--
+  Miniapp WEBVIEW SHELL (simulation).
+
+  This page plays the role of the native Zalo/Telegram miniapp container:
+    * the phone frame + worker cards are "the miniapp"
+    * the iframe is "the webview"
+    * the postMessage listener is "the native navigation interceptor" —
+      the one piece the real miniapp implements natively:
+        - navigation to http://localhost:PORT/... → POST /api/auth/:p/callback
+        - a code displayed on a provider page     → POST /api/auth/:p/input
+  Everything the user does: tap Connect, tap Approve. Zero copy-paste.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>miniapp sim — ACP worker setup</title>
+<style>
+  body { font-family:-apple-system,system-ui,sans-serif; background:#0b0e12; color:#e8e8e8;
+         display:flex; gap:24px; justify-content:center; align-items:flex-start; padding:24px; flex-wrap:wrap; }
+  .phone { width:360px; border:2px solid #2a323c; border-radius:28px; padding:18px; background:#12161c; }
+  .notch { width:120px; height:18px; background:#2a323c; border-radius:9px; margin:0 auto 14px; }
+  h1 { font-size:1.05em; text-align:center; margin:0 0 12px; }
+  .card { background:#1a2027; border-radius:12px; padding:12px 14px; margin:10px 0; }
+  .row { display:flex; justify-content:space-between; align-items:center; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; }
+  .on{background:#3ddc84} .off{background:#5a6672} .busy{background:#e8b23e}
+  button { background:#2f6fed; color:#fff; border:0; border-radius:8px; padding:8px 13px; font-size:.92em; cursor:pointer; }
+  button:disabled{opacity:.45}
+  .state { color:#8b98a8; font-size:.8em; }
+  .webview { margin-top:12px; border:1px solid #2a323c; border-radius:12px; overflow:hidden;
+             height:330px; display:none; background:#fff; }
+  .webview iframe { width:100%; height:295px; border:0; }
+  .wvbar { background:#20262e; color:#9ab; font-size:.72em; padding:8px 10px;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .logpane { width:420px; max-width:90vw; }
+  .logpane h2 { font-size:.95em; color:#9ab; }
+  #log { background:#10141a; border:1px solid #2a323c; border-radius:10px; padding:12px;
+         font:.76em/1.5 ui-monospace,monospace; height:520px; overflow-y:auto; }
+  .evt-native { color:#e8b23e; } .evt-api { color:#7ab7ff; } .evt-ok { color:#3ddc84; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="notch"></div>
+  <h1>⚙️ Assistant — worker setup</h1>
+  <div id="cards"></div>
+  <div class="webview" id="wv">
+    <div class="wvbar" id="wvurl">about:blank</div>
+    <iframe id="wvframe" src="about:blank"></iframe>
+  </div>
+</div>
+
+<div class="logpane">
+  <h2>Event log (what the miniapp + native layer are doing)</h2>
+  <div id="log"></div>
+</div>
+
+<script>
+const WORKERS = [
+  { id: "claude",  label: "Claude Code", note: "paste-back code flow" },
+  { id: "codex",   label: "Codex",       note: "localhost callback flow" },
+  { id: "copilot", label: "Copilot",     note: "device code flow" },
+];
+let active = null; // provider whose login is in progress
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function log(cls, msg) {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.innerHTML = `<span style="color:#566">${new Date().toLocaleTimeString()}</span> ${esc(msg)}`;
+  $("log").appendChild(d); $("log").scrollTop = 1e9;
+}
+const api = (p, opt = {}) =>
+  fetch("/api" + p, { ...opt, headers: { "Content-Type": "application/json" } }).then((r) => r.json());
+
+$("cards").innerHTML = WORKERS.map(w => `
+  <div class="card"><div class="row">
+    <div><span class="dot off" id="dot-${w.id}"></span><b>${w.label}</b><br>
+      <span class="state" id="st-${w.id}">${w.note}</span></div>
+    <button id="btn-${w.id}" onclick="connect('${w.id}')">Connect</button>
+  </div></div>`).join("");
+
+function setWebview(url) {
+  if (!url) { $("wv").style.display = "none"; $("wvframe").src = "about:blank"; return; }
+  $("wv").style.display = "block";
+  $("wvurl").textContent = url;
+  $("wvframe").src = url;
+}
+
+async function connect(id) {
+  active = id;
+  WORKERS.forEach(w => $("btn-" + w.id).disabled = true);
+  log("evt-api", `miniapp → POST /api/auth/${id}/start`);
+  await api(`/auth/${id}/start`, { method: "POST" });
+  poll(id);
+}
+
+async function poll(id) {
+  const s = await api(`/auth/${id}/status`);
+  $("st-" + id).textContent = s.state;
+  $("dot-" + id).className = "dot " + (s.state === "success" ? "on" : "busy");
+
+  if (s.state === "awaiting_approval" && s.authUrl && $("wvframe").src.indexOf(s.authUrl) === -1) {
+    log("evt-api", `backend captured auth URL — miniapp opens webview: ${s.authUrl}`);
+    setWebview(s.authUrl);
+  }
+  if (s.state === "success") {
+    log("evt-ok", `✔ ${id} connected (tokens in shared volume; gateway sees them instantly)`);
+    setWebview(null);
+    WORKERS.forEach(w => $("btn-" + w.id).disabled = false);
+    $("dot-" + id).className = "dot on";
+    active = null;
+    return;
+  }
+  if (s.state === "error") {
+    log("evt-native", `✘ ${id} failed: ${s.error}`);
+    setWebview(null);
+    WORKERS.forEach(w => $("btn-" + w.id).disabled = false);
+    active = null;
+    return;
+  }
+  setTimeout(() => poll(id), 900);
+}
+
+// ============ THE NATIVE LAYER (what a real miniapp implements) =============
+window.addEventListener("message", async (ev) => {
+  const msg = ev.data || {};
+  if (msg.type === "navigate") {
+    const u = new URL(msg.url, location.href);
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+      // The OAuth redirect that would die on the phone. Intercept it.
+      log("evt-native", `⚡ NATIVE: intercepted navigation to ${u.host}${u.pathname} — NOT navigating`);
+      log("evt-api", `miniapp → POST /api/auth/${active}/callback { url }`);
+      const r = await api(`/auth/${active}/callback`, { method: "POST", body: JSON.stringify({ url: msg.url }) });
+      if (r.error) log("evt-native", `backend rejected callback: ${r.error}`);
+      setWebview(null);
+    } else {
+      log("evt-native", `NATIVE: allowing navigation to ${u.host}`);
+      setWebview(msg.url);
+    }
+  }
+  if (msg.type === "page-code") {
+    // Provider page displayed a paste-back code; webview reads it off the DOM.
+    log("evt-native", `⚡ NATIVE: read code "${msg.code}" off the provider page`);
+    log("evt-api", `miniapp → POST /api/auth/${active}/input { code }`);
+    const r = await api(`/auth/${active}/input`, { method: "POST", body: JSON.stringify({ text: msg.code }) });
+    if (r.error) log("evt-native", `backend rejected code: ${r.error}`);
+    setWebview(null);
+  }
+});
+
+log("evt-ok", "miniapp sim ready — tap Connect on any worker");
+</script>
+</body>
+</html>

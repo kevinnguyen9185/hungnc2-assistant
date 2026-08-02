@@ -1,0 +1,24 @@
+sequenceDiagram
+    autonumber
+    actor U as User (phone)
+    participant M as Miniapp (webview)
+    participant B as Backend (VPS :8788)
+    participant C as codex CLI (pty, same box)
+    participant P as OpenAI OAuth
+
+    U->>M: tap "Connect Codex"
+    M->>B: POST /api/auth/codex/start
+    B->>C: spawn `codex login` (callback server on 127.0.0.1:1455)
+    C-->>B: prints auth URL (captured from pty)
+    B-->>M: state=awaiting_approval + authUrl
+    M->>P: open authUrl in webview
+    U->>P: sign in + approve
+    P-->>M: redirect to http://localhost:1455/auth/callback?code=...
+    Note over M: dead URL on the phone — the webview<br/>INTERCEPTS it (no copy-paste)
+    M->>B: POST /api/auth/codex/callback { url }
+    B->>C: replay GET on 127.0.0.1:1455 (same box = it lands)
+    C->>P: exchange code for tokens
+    C-->>B: exit 0 → probe "codex login status" OK
+    B->>B: sync auth.json → acpx/codex-home + trust projects dir
+    B-->>M: state=success
+    M-->>U: Codex connected ✓
