@@ -222,9 +222,11 @@ install_hint() {
 
 is_logged_in() {
   case "$1" in
-    # cheap non-interactive probes; a failing probe just means "login needed"
-    claude) in_ct "claude -p 'ping' --max-turns 1" >/dev/null 2>&1 ;;
-    codex)  in_ct "codex login status" >/dev/null 2>&1 ;;
+    # cheap non-interactive probes; a failing probe just means "login needed".
+    # `timeout` is essential: with a stale/unreachable token the claude CLI
+    # retries for ages instead of failing — treat "slow" as "not logged in".
+    claude) in_ct "timeout 30 claude -p 'ping' --max-turns 1" >/dev/null 2>&1 ;;
+    codex)  in_ct "timeout 15 codex login status" >/dev/null 2>&1 ;;
   esac
 }
 

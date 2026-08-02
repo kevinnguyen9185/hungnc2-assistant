@@ -58,15 +58,16 @@ What carries over without re-login (all inside `data/`):
 - Telegram pairing / owner id → `data/openclaw/openclaw.json`
 - cron job "morning-review", agents list, all config
 
-## On the VPS, in order
+## On the VPS: one script
 
 ```bash
 cd ~/hungnc2-assistant
-docker compose up -d --build     # rebuilds image for x86_64
-# fix ownership (trap #2), then:
-./scripts/setup-acp.sh           # idempotent — verifies logins, re-syncs codex-home
-docker compose exec openclaw openclaw doctor
+./scripts/setup-vps.sh
 ```
+
+It handles Docker install, swap, firewall (Ubuntu/Rocky auto-detected),
+the arch-stale npm cache (trap #1), ownership fix (trap #2), compose build,
+setup-acp.sh, and the Notion extras. Idempotent — re-run anytime.
 
 If a login didn't survive the move:
 - claude: `./scripts/setup-acp.sh claude` (URL flow works over ssh)
@@ -89,8 +90,13 @@ ssh -L 18789:127.0.0.1:18789 -L 8788:127.0.0.1:8788 user@vps
 
 ## VPS hardening (once)
 
+Handled automatically by `./scripts/setup-vps.sh` (detects Ubuntu → ufw,
+Rocky → firewalld). Manual equivalent:
+
 ```bash
-# firewall: nothing inbound except ssh
+# Ubuntu:
+sudo ufw default deny incoming && sudo ufw allow ssh && sudo ufw --force enable
+# Rocky:
 sudo firewall-cmd --set-default-zone=drop
 sudo firewall-cmd --zone=drop --add-service=ssh --permanent
 sudo firewall-cmd --reload
