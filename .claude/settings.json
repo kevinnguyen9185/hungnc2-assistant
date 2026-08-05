@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant sh -lc \"ls -la ~/.openclaw/nodes ~/.openclaw/devices; echo ---CAT---; for f in ~/.openclaw/nodes/*; do echo \\\\\"## \\\\$f\\\\\"; head -c 2000 \\\\\"\\\\$f\\\\\"; echo; done\"')",
+      "Bash(node -e ' *)",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant sh -lc \"cat ~/.openclaw/devices/pending.json\" ')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'date -u +\"HOST NOW UTC: %F %T \\(%s\\)\"; echo; for i in 1 2 3; do docker exec hungnc2-assistant sh -lc \"stat -c \\\\\"%y %n\\\\\" ~/.openclaw/devices/pending.json ~/.openclaw/nodes/paired.json; grep -o \\\\\"refreshedAtMs[^,}]*\\\\\" ~/.openclaw/devices/pending.json\"; sleep 20; done; echo \"=== who is connected to 18789 on host ===\"; sudo ss -tnp 2>/dev/null | grep -E \"18789\" | head -20')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'ID=e49f563041cd9a3cd49e77ba4c5fa80e6e9f517a1eed4f75649e4fab9120c359; echo \"### devices remove \\\\$ID\"; docker exec hungnc2-assistant openclaw devices remove \"$ID\" --json 2>&1 | tail -15; echo \"exit=$?\"')",
+      "Bash(/opt/homebrew/bin/openclaw plugins *)",
+      "Bash(python3 -c ' *)",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant sh -lc \"openclaw nodes list --json 2>/dev/null | tail -40; echo ===PAIRED_FILE===; cat ~/.openclaw/nodes/paired.json\"')",
+      "Bash(/opt/homebrew/bin/openclaw browser *)",
+      "Bash(node caps2.mjs entry)",
+      "Bash(cp ~/.openclaw/openclaw.json /private/tmp/claude-501/-Users-hungnguyen-Claude-Projects-hungnc2-assistant/b758d2cc-d1d6-469d-8eec-13ab3a24bb13/scratchpad/openclaw.json.backup)",
+      "Bash(/opt/homebrew/bin/openclaw config *)",
+      "Bash(node caps.mjs)",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw nodes remove --node e49f563041cd9a3cd49e77ba4c5fa80e6e9f517a1eed4f75649e4fab9120c359 2>&1 | tail -3')",
+      "Bash(launchctl kickstart *)",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant sh -lc \"cat ~/.openclaw/devices/pending.json\"')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant sh -lc \"echo ===DEVICES; openclaw devices list 2>/dev/null | tail -20; echo ===NODES_PENDING; openclaw nodes pending 2>/dev/null | tail -20; echo ===NODES_PAIRED_FILE; cat ~/.openclaw/nodes/pending.json ~/.openclaw/nodes/paired.json\"')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw devices list 2>&1 | tail -25')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw devices approve bd0f69a8-8e6c-4f3e-ad27-0c08fc7cef7f 2>&1 | tail -8')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw nodes status 2>/dev/null | tail -25; echo ===FILE===; docker exec hungnc2-assistant sh -lc \"cat ~/.openclaw/nodes/paired.json\"')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw nodes approve 8fd04c73-cdd4-454b-9a9f-1927f3f8f18f 2>&1 | tail -12')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant sh -lc \"python3 -c \\\\\"import json;d=json.load\\(open\\(\\\\\\\\\\\\\"/home/openclaw/.openclaw/nodes/paired.json\\\\\\\\\\\\\"\\)\\);[print\\(k[:12], v[\\\\\\\\\\\\\"displayName\\\\\\\\\\\\\"], \\\\\\\\\\\\\"| caps:\\\\\\\\\\\\\", v.get\\(\\\\\\\\\\\\\"caps\\\\\\\\\\\\\"\\), \\\\\\\\\\\\\"| cmds:\\\\\\\\\\\\\", v.get\\(\\\\\\\\\\\\\"commands\\\\\\\\\\\\\"\\)\\) for k,v in d.items\\(\\)]\"')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant grep -A6 caps /home/openclaw/.openclaw/nodes/paired.json')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw nodes status 2>/dev/null | grep -iE \"Known|Connected|brow\" | head -5')",
+      "Bash(bash -n /Users/hungnguyen/Claude/Projects/hungnc2-assistant/scripts/openclaw-laptop-node.sh)",
+      "Bash(/Users/hungnguyen/Claude/Projects/hungnc2-assistant/scripts/openclaw-laptop-node.sh status *)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --version)",
+      "Bash(grep -vE \"^│  -|^◇|^├|^│$\")",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser profiles 2>&1 | grep -vE \"^│|^◇|^├|acpx\" | tail -25')",
+      "Bash(lsof -nP -iTCP:18799 -sTCP:LISTEN)",
+      "Bash(/Users/hungnguyen/Claude/Projects/hungnc2-assistant/scripts/openclaw-laptop-node.sh browser-pair *)",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser profiles 2>&1 | grep -vE \"^│|^◇|^├|acpx\" | tail -20')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser profiles 2>&1 | grep -vE \"^│|^◇|^├|acpx|^Config\" | tail -12')",
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser tabs 2>&1 | grep -vE \"^│|^◇|^├|acpx|^Config\" | tail -20')"
+    ]
+  }
+}
