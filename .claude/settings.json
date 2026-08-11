@@ -34,7 +34,21 @@
       "Bash(/Users/hungnguyen/Claude/Projects/hungnc2-assistant/scripts/openclaw-laptop-node.sh browser-pair *)",
       "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser profiles 2>&1 | grep -vE \"^│|^◇|^├|acpx\" | tail -20')",
       "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser profiles 2>&1 | grep -vE \"^│|^◇|^├|acpx|^Config\" | tail -12')",
-      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser tabs 2>&1 | grep -vE \"^│|^◇|^├|acpx|^Config\" | tail -20')"
+      "Bash(ssh -i ~/.ssh/id_ed25519_hetzner -o BatchMode=yes ubuntu@135.181.85.161 'docker exec hungnc2-assistant openclaw browser tabs 2>&1 | grep -vE \"^│|^◇|^├|acpx|^Config\" | tail -20')",
+      "Bash(git --version)",
+      "Bash(chmod +x scripts/sync-projects.sh)",
+      "Bash(bash -n scripts/sync-projects.sh)",
+      "Bash(./scripts/sync-projects.sh --help)",
+      "Bash(bash --version)",
+      "Bash(grep -n '^# =\\\\+$' scripts/sync-projects.sh)",
+      "Bash(./scripts/sync-projects.sh --dry-run)",
+      "Bash(./scripts/sync-projects.sh)",
+      "Bash(./scripts/sync-projects.sh --only xyz --dry-run)",
+      "Bash(./scripts/sync-projects.sh --up --dry-run)",
+      "Bash(WORKSPACE_DIR=/private/tmp/claude-501/-Users-hungnguyen-Claude-Projects-hungnc2-assistant/c61b96bb-6810-4dca-8f49-4d4e237273c2/scratchpad/ws ./scripts/sync-projects.sh --up --no-clone --only testrepo)",
+      "Bash(echo \"exit code khi bị chặn secret: $? \\(kỳ vọng khác 0\\)\")",
+      "Bash(echo \"exit code khi sạch: $? \\(kỳ vọng 0\\)\")",
+      "Bash(git -C /private/tmp/claude-501/-Users-hungnguyen-Claude-Projects-hungnc2-assistant/c61b96bb-6810-4dca-8f49-4d4e237273c2/scratchpad/remote.git -c core.quotepath=false ls-tree -r --name-only main)"
     ]
   }
 }
