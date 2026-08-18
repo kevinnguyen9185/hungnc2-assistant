@@ -32,7 +32,12 @@
 set -euo pipefail
 
 CONTAINER="${CONTAINER:-hungnc2-assistant}"
-MODEL_REF="${MODEL_REF:-openrouter/deepseek/deepseek-v4-flash}"
+# "~deepseek/...-latest" is OpenRouter's ALIAS id (the ~ is part of the id):
+# it always routes to the newest V4 Flash snapshot (0731 as of 2026-08).
+# The old default "deepseek/deepseek-v4-flash" was silently pinned to the
+# 0423 snapshot. To switch models later use scripts/set-model.sh — rerunning
+# this whole script just for a model change is overkill.
+MODEL_REF="${MODEL_REF:-openrouter/~deepseek/deepseek-v4-flash-latest}"
 PROJECTS_DIR="/home/openclaw/workspace/projects"
 AGENTS=("$@")
 [[ ${#AGENTS[@]} -eq 0 ]] && AGENTS=(claude codex)
@@ -103,7 +108,8 @@ else
   warn "OPENROUTER_API_KEY missing in .env — starting interactive key login:"
   in_ct_it 'openclaw models auth login --provider openrouter --method api-key'
 fi
-in_ct "openclaw models set $MODEL_REF"
+# quote the ref: OpenRouter alias ids start with "~" after the provider prefix
+in_ct "openclaw models set '$MODEL_REF'"
 ok "default model set to $MODEL_REF"
 
 # --- 2b. GitHub: the sync backbone ---------------------------------------------
